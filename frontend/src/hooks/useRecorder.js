@@ -27,12 +27,18 @@ const useRecorder = () => {
       setAnalyser(analyserNode);
 
       // 2. Setup MediaRecorder
-      // Detect the correct MIME type for this browser
       const mimeType = MediaRecorder.isTypeSupported('audio/webm') 
         ? 'audio/webm' 
         : 'audio/mp4';
 
-      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      // OPTIMIZATION: Limit bitrate to 128kbps. 
+      // This keeps the file size small (faster upload) and faster to decode on the server.
+      const options = { 
+        mimeType, 
+        audioBitsPerSecond: 128000 
+      };
+
+      const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -43,11 +49,9 @@ const useRecorder = () => {
       };
 
       mediaRecorder.onstop = () => {
-        // Create blob with the REAL mime type (not fake wav)
         const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
         setAudioBlob(audioBlob);
         
-        // Cleanup Audio Context & Stream
         if (streamRef.current) {
           streamRef.current.getTracks().forEach(track => track.stop());
         }

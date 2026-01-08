@@ -9,22 +9,30 @@ def extract_notes_from_audio(audio_path: str):
     print(f"🎵 Analyzing: {audio_path}")
     
     try:
-        # 1. LOAD AUDIO (Matches PDF Source)
+        # --- PERFORMANCE SETTINGS ---
+        # Optimization: Process every 512 samples (~32ms) instead of 256 (~16ms).
+        # This makes the analysis ~2x FASTER on low-CPU servers like Render.
         TARGET_SR = 16000 
+        HOP_LENGTH = 512  
+        
+        # 1. LOAD AUDIO
         y, sr = librosa.load(audio_path, sr=TARGET_SR, mono=True)
         
-        # Normalize
+        # Normalize volume
         rms = np.sqrt(np.mean(y**2))
-        y_norm = y * ((10**(-20/20)) / (rms + 1e-9))
+        if rms > 0:
+            y_norm = y * ((10**(-20/20)) / (rms + 1e-9))
+        else:
+            y_norm = y
 
-        # 2. PITCH DETECTION (pYIN with PDF Parameters)
+        # 2. PITCH DETECTION (Optimized)
         f0, voiced_flag, voiced_probs = librosa.pyin(
             y_norm, 
             fmin=50, 
             fmax=1000, 
             sr=sr,
             frame_length=2048,
-            hop_length=256
+            hop_length=HOP_LENGTH # Using 512 here
         )
         
         midi_pitch = librosa.hz_to_midi(np.nan_to_num(f0))
@@ -40,8 +48,10 @@ def extract_notes_from_audio(audio_path: str):
             for j in range(len(onset_times)-1):
                 t_start = onset_times[j]
                 t_end = onset_times[j+1]
-                idx_start = int(t_start * sr / 256)
-                idx_end = int(t_end * sr / 256)
+                
+                # Math must match the new HOP_LENGTH
+                idx_start = int(t_start * sr / HOP_LENGTH)
+                idx_end = int(t_end * sr / HOP_LENGTH)
                 
                 if idx_end > idx_start and idx_end < len(midi_pitch):
                     segment_pitches = midi_pitch[idx_start:idx_end]
@@ -63,15 +73,22 @@ def extract_notes_from_audio(audio_path: str):
             difs = np.diff(bounded)
             starts = np.where(difs == 1)[0]
             ends = np.where(difs == -1)[0]
-            times = librosa.times_like(f0, sr=sr, hop_length=256)
+            
+            # Times generation must also match HOP_LENGTH
+            times = librosa.times_like(f0, sr=sr, hop_length=HOP_LENGTH)
 
             for s, e in zip(starts, ends):
                 if e > s:
-                    dur = times[min(e, len(times)-1)] - times[s]
+                    # Safety check for index out of bounds
+                    end_idx = min(e, len(times)-1)
+                    start_idx = min(s, len(times)-1)
+                    
+                    dur = times[end_idx] - times[start_idx]
+                    
                     if dur > 0.1:
                         avg_pitch = int(round(np.median(midi_pitch[s:e])))
                         segments.append({
-                            "start": times[s],
+                            "start": times[start_idx],
                             "duration": dur,
                             "pitch": avg_pitch,
                             "name": librosa.midi_to_note(avg_pitch, unicode=False)
