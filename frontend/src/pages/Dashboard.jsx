@@ -187,6 +187,15 @@ const Dashboard = () => {
         try {
             const savedData = JSON.parse(item.analysis_data);
             setStudentData(savedData);
+            
+            // 🚨 NEW LOGIC: RESTORE TEACHER DATA FROM HISTORY 🚨
+            if (savedData.teacher_data) {
+                setTeacherData(savedData.teacher_data);
+            } else {
+                // If opening a VERY old history item that didn't save teacher data
+                setTeacherData(null); 
+            }
+
             setStudentAudioURL(getApiUrl(`/api/audio/${item.audio_filename}`));
             setMode('student');
             setIsProfileOpen(false);
@@ -219,14 +228,10 @@ const Dashboard = () => {
         setStatus('processing');
         const formData = new FormData();
         
-        let fileName = 'recording.webm'; // Default for mic recording
-        
-        // 🚨 INTELLIGENT FORMAT HANDLING 🚨
+        let fileName = 'recording.webm'; 
         if (fileBlob.name) {
-            // It's a FILE UPLOAD (mp3, flac, etc.) -> Use original name
             fileName = fileBlob.name;
         } else {
-             // It's a MIC RECORDING -> Use blob type
              const ext = fileBlob.type.includes('wav') ? 'wav' : 'webm';
              fileName = `recording.${ext}`;
         }

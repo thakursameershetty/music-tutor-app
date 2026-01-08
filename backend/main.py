@@ -6,14 +6,15 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 import shutil
 import os
-import glob # IMPORT GLOB FOR CLEANUP
+import glob
 import json
 import uuid  # For unique filenames
 
 # Import core modules
+# UPDATED: Added load_reference_melody to imports
 from core.transcription import extract_notes_from_audio
 from core.music_gen import generate_musicxml
-from core.feedback import calculate_feedback, save_reference_melody, generate_performance_pdf
+from core.feedback import calculate_feedback, save_reference_melody, load_reference_melody, generate_performance_pdf
 from core import models, database, auth
 
 # --- 1. DATABASE INIT ---
@@ -67,9 +68,8 @@ def get_history(current_user: models.User = Depends(auth.get_current_user), db: 
 @app.post("/api/teach")
 async def teach_lesson(file: UploadFile = File(...)):
     try:
-        # 1. DETECT EXTENSION (Support MP3, FLAC, AAC, etc.)
+        # 1. DETECT EXTENSION
         filename, file_extension = os.path.splitext(file.filename)
-        # Default to .wav if missing
         if not file_extension:
             file_extension = ".wav"
             
@@ -79,7 +79,7 @@ async def teach_lesson(file: UploadFile = File(...)):
         with open(file_location, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # 3. PROCESS (Librosa + FFmpeg handles the format automatically)
+        # 3. PROCESS
         teacher_notes = extract_notes_from_audio(file_location)
         if not teacher_notes:
             return {"status": "error", "message": "No notes detected."}
@@ -99,15 +99,11 @@ async def analyze_student(
     db: Session = Depends(auth.get_db)
 ):
     try:
-        # 0. CLEANUP OLD FILES (Fix for Score Consistency)
-        # We must remove any 'student_attempt.*' files (wav, mp3, webm, etc.)
-        # so the system doesn't accidentally load an old file later.
+        # 0. CLEANUP OLD FILES
         old_files = glob.glob("storage/audio_samples/student_attempt.*")
         for f in old_files:
-            try:
-                os.remove(f)
-            except OSError:
-                pass
+            try: os.remove(f)
+            except OSError: pass
 
         # 1. DETECT EXTENSION
         filename, file_extension = os.path.splitext(file.filename)
@@ -120,20 +116,31 @@ async def analyze_student(
         with open(temp_location, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # 3. ANALYZE
+        # 3. ANALYZE STUDENT
         student_notes = extract_notes_from_audio(temp_location)
         feedback = calculate_feedback(student_notes, temp_location)
-        xml_content = generate_musicxml(student_notes)
+        student_xml = generate_musicxml(student_notes)
         
+        # 4. CAPTURE TEACHER DATA (The Missing Link!)
+        # We load the CURRENT teacher reference and freeze it into this history item.
+        teacher_notes = load_reference_melody()
+        teacher_xml = generate_musicxml(teacher_notes) if teacher_notes else ""
+        
+        teacher_snapshot = {
+            "notes": teacher_notes,
+            "musicxml": teacher_xml
+        }
+
         full_response = {
             "status": "success",
             "mode": "student",
             "notes": student_notes,
-            "musicxml": xml_content,
-            "feedback": feedback
+            "musicxml": student_xml,
+            "feedback": feedback,
+            "teacher_data": teacher_snapshot # <--- SAVED HERE PERMANENTLY
         }
 
-        # 4. SAVE TO HISTORY (Persistent)
+        # 5. SAVE TO DB
         unique_filename = f"{current_user.id}_{uuid.uuid4()}{file_extension}"
         history_path = f"storage/history/{unique_filename}"
         shutil.copy(temp_location, history_path)
@@ -157,17 +164,12 @@ async def analyze_student(
 @app.get("/api/report")
 async def get_report():
     try:
-        # We need to find the student file regardless of extension
         base_path = "storage/audio_samples/student_attempt"
         student_path = None
-        
-        # Check for common extensions
-        # Since we cleaned up in /analyze, only ONE file should exist now.
         for ext in [".wav", ".webm", ".mp3", ".flac", ".m4a", ".aac"]:
             if os.path.exists(base_path + ext):
                 student_path = base_path + ext
-                break
-                
+                break     
         if not student_path:
              raise HTTPException(status_code=404, detail="No student recording found")
         
@@ -190,26 +192,21 @@ def get_audio(filename: str):
         raise HTTPException(status_code=404, detail="Audio not found")
     return FileResponse(path)
 
-# --- 7. SERVE FRONTEND (STATIC FILES) ---
+# --- 7. SERVE FRONTEND ---
 frontend_path = "../frontend/dist"
-
 if os.path.exists(frontend_path):
     app.mount("/assets", StaticFiles(directory=f"{frontend_path}/assets"), name="assets")
-
     @app.get("/{full_path:path}")
     async def serve_react_app(full_path: str):
         if full_path.startswith("api/"):
             raise HTTPException(status_code=404, detail="API Endpoint Not Found")
-        
         file_path = os.path.join(frontend_path, full_path)
         if os.path.exists(file_path) and os.path.isfile(file_path):
             return FileResponse(file_path)
-            
         return FileResponse(f"{frontend_path}/index.html")
 else:
-    print("WARNING: Frontend build folder not found. Did you run 'npm run build'?")
+    print("WARNING: Frontend build folder not found.")
 
-# --- 8. STARTUP BLOCK ---
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="127.0.0.1", port=8000)
