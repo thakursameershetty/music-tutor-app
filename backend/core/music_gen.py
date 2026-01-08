@@ -1,3 +1,6 @@
+import matplotlib
+matplotlib.use('Agg') 
+import matplotlib.pyplot as plt
 from music21 import stream, note, tempo, meter, metadata
 import tempfile
 import os
