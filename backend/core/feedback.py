@@ -13,7 +13,17 @@ from scipy.spatial.distance import euclidean
 from xhtml2pdf import pisa
 
 REFERENCE_FILE = "storage/reference_melody.json"
-TEACHER_AUDIO_FILE = "storage/audio_samples/teacher_reference.wav"
+# REMOVED HARDCODED .wav CONSTANT
+
+# --- HELPER TO FIND TEACHER FILE (MP3, WAV, etc.) ---
+def get_teacher_audio_path():
+    base_path = "storage/audio_samples/teacher_reference"
+    # Check for all common extensions
+    for ext in [".wav", ".mp3", ".webm", ".flac", ".m4a", ".aac", ".ogg"]:
+        path = base_path + ext
+        if os.path.exists(path):
+            return path
+    return None
 
 def save_reference_melody(notes):
     os.makedirs(os.path.dirname(REFERENCE_FILE), exist_ok=True)
@@ -63,10 +73,11 @@ def generate_pdf_graphs(y_ref, sr_ref, y_stu, sr_stu):
     return graphs
 
 def generate_performance_pdf(student_audio_path, score, feedback_list):
-    if not os.path.exists(TEACHER_AUDIO_FILE): return None
+    teacher_path = get_teacher_audio_path()
+    if not teacher_path: return None
 
     # Load Audio
-    y_ref, sr_ref = librosa.load(TEACHER_AUDIO_FILE)
+    y_ref, sr_ref = librosa.load(teacher_path)
     y_stu, sr_stu = librosa.load(student_audio_path)
 
     # Generate Graphs
@@ -149,11 +160,12 @@ def generate_graph_data(student_audio_path, teacher_notes, student_notes):
     # Default empty structure to prevent frontend crashes
     default_data = { "pitch_data": [], "rhythm_data": [], "piano_roll": [], "heatmap": None }
     
-    if not os.path.exists(TEACHER_AUDIO_FILE): 
+    teacher_path = get_teacher_audio_path()
+    if not teacher_path: 
         return default_data
 
     try:
-        y_ref, sr_ref = librosa.load(TEACHER_AUDIO_FILE)
+        y_ref, sr_ref = librosa.load(teacher_path)
         y_stu, sr_stu = librosa.load(student_audio_path)
         dur_ref = librosa.get_duration(y=y_ref, sr=sr_ref)
 
