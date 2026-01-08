@@ -5,7 +5,6 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3000,
-    // Add this line to allow Ngrok tunneling
     allowedHosts: true, 
     proxy: {
       '/api': {

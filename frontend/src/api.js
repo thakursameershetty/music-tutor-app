@@ -1,9 +1,7 @@
 // frontend/src/api.js
 
-// DIRECT LINK TO RENDER (Temporary Fix)
-const API_BASE_URL = "https://music-tutor-app.onrender.com"; 
+// Leave this empty for development. 
+// Vite's proxy will forward requests to http://127.0.0.1:8000
+const API_BASE_URL = ""; 
 
-// Remove trailing slash to be safe
-const cleanBaseUrl = API_BASE_URL.replace(/\/$/, "");
-
-export const getApiUrl = (endpoint) => `${cleanBaseUrl}${endpoint}`;
+export const getApiUrl = (endpoint) => `${API_BASE_URL}${endpoint}`;

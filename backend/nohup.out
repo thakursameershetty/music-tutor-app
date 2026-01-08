@@ -1,0 +1,10 @@
+INFO:     Started server process [94503]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started server process [95021]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     125.62.204.84:0 - "GET /api/me/history HTTP/1.1" 401 Unauthorized
+INFO:     125.62.204.84:0 - "GET /api/me/history HTTP/1.1" 401 Unauthorized

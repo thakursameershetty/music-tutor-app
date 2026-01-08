@@ -170,10 +170,16 @@ const Dashboard = () => {
         if (!token) return;
         try {
             const response = await fetch('/api/me/history', { headers: { 'Authorization': `Bearer ${token}` } });
+            
+            // Check if response is OK before parsing JSON
             if (response.ok) {
                 const data = await response.json();
                 setHistory(data);
-            } else if (response.status === 401) handleLogout();
+            } else if (response.status === 401) {
+                handleLogout();
+            } else {
+                console.error("Failed to fetch history:", response.status);
+            }
         } catch (e) { console.error("History fetch error:", e); }
     };
 
@@ -223,7 +229,16 @@ const Dashboard = () => {
             const response = await fetch(endpoint, {
                 method: 'POST', body: formData, headers: token ? { 'Authorization': `Bearer ${token}` } : {}
             });
+            
             if (response.status === 401) { handleLogout(); return; }
+
+            // SAFETY CHECK: Ensure we got a valid response before parsing
+            if (!response.ok) {
+                console.error("Server Error:", response.status);
+                setStatus('error');
+                return;
+            }
+
             const data = await response.json();
 
             if (data.status === 'success') {
@@ -234,7 +249,10 @@ const Dashboard = () => {
                     fetchHistory();
                 }
             } else { setStatus('error'); }
-        } catch (e) { console.error(e); setStatus('error'); }
+        } catch (e) { 
+            console.error("Upload error:", e); 
+            setStatus('error'); 
+        }
     };
 
     const handleDownloadReport = async () => {
@@ -272,7 +290,6 @@ const Dashboard = () => {
     };
 
     const AnalysisTopBar = () => (
-        // ADDED 'overflow-visible' HERE 👇
         <GlassCard className="flex items-center justify-between p-3 bg-white/5 border-b border-white/10 sticky top-0 z-50 backdrop-blur-xl mb-6 overflow-visible">
             {/* LEFT: Title & Back Button */}
             <div className="flex items-center gap-4">
@@ -324,7 +341,6 @@ const Dashboard = () => {
         </GlassCard>
     );
 
-    // --- RESTORED COMPONENT: RecorderCard ---
     const RecorderCard = ({ label }) => (
         <GlassCard className="flex flex-col items-center justify-center p-6 border-white/10 bg-black/20 relative overflow-hidden h-full min-h-[400px]">
             <div className="absolute inset-0 z-0 opacity-40">
