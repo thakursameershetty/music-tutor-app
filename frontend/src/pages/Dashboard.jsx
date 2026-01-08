@@ -8,7 +8,7 @@ import {
     Zap, BarChart3, ChevronRight, Upload, History,
     Play, Pause, RefreshCw, Volume2, LayoutTemplate,
     Eye, EyeOff, RotateCcw, MousePointer2, Download,
-    LogOut, User as UserIcon, Calendar, ChevronDown
+    LogOut, User as UserIcon, Calendar, ChevronDown, AlertCircle
 } from 'lucide-react';
 import { OrbitControls, Stars, Float } from '@react-three/drei';
 import {
@@ -98,6 +98,7 @@ const Dashboard = () => {
     const [studentData, setStudentData] = useState(null);
     const [teacherAudioURL, setTeacherAudioURL] = useState(null);
     const [studentAudioURL, setStudentAudioURL] = useState(null);
+    const [errorMsg, setErrorMsg] = useState(null); // New Error State
 
     // Profile & History State
     const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -111,21 +112,19 @@ const Dashboard = () => {
     const [focusMode, setFocusMode] = useState('all');
     const [isScrubbingEnabled, setIsScrubbingEnabled] = useState(false);
 
-    // --- AUDIO "PRIMING" (Unlock Browser Autoplay) ---
     const toggleScrubbing = async () => {
         const newState = !isScrubbingEnabled;
         setIsScrubbingEnabled(newState);
-
         if (newState) {
             const prime = async (ref) => {
                 if (ref.current) {
                     try {
                         const vol = ref.current.volume;
-                        ref.current.volume = 0; // Mute
+                        ref.current.volume = 0; 
                         await ref.current.play();
                         ref.current.pause();
                         ref.current.currentTime = 0;
-                        ref.current.volume = vol; // Restore volume
+                        ref.current.volume = vol; 
                     } catch (e) { console.log("Audio prime failed", e); }
                 }
             };
@@ -165,7 +164,6 @@ const Dashboard = () => {
         if (studentAudioRef.current) studentAudioRef.current.pause();
     };
 
-    // --- History Fetching ---
     const fetchHistory = async () => {
         const token = localStorage.getItem('musicTutorToken');
         if (!token) return;
@@ -182,20 +180,15 @@ const Dashboard = () => {
 
     useEffect(() => { fetchHistory(); }, []);
 
-    // --- Load Old Session ---
     const loadHistoryItem = (item) => {
         try {
             const savedData = JSON.parse(item.analysis_data);
             setStudentData(savedData);
-            
-            // 🚨 NEW LOGIC: RESTORE TEACHER DATA FROM HISTORY 🚨
             if (savedData.teacher_data) {
                 setTeacherData(savedData.teacher_data);
             } else {
-                // If opening a VERY old history item that didn't save teacher data
                 setTeacherData(null); 
             }
-
             setStudentAudioURL(getApiUrl(`/api/audio/${item.audio_filename}`));
             setMode('student');
             setIsProfileOpen(false);
@@ -226,13 +219,21 @@ const Dashboard = () => {
 
     const handleUpload = async (fileBlob) => {
         setStatus('processing');
-        const formData = new FormData();
+        setErrorMsg(null);
         
+        const formData = new FormData();
         let fileName = 'recording.webm'; 
+        
+        // --- SMART EXTENSION FIX ---
         if (fileBlob.name) {
-            fileName = fileBlob.name;
+            fileName = fileBlob.name; // File upload
         } else {
-             const ext = fileBlob.type.includes('wav') ? 'wav' : 'webm';
+             // Mic Recording: Check MIME type carefully
+             let ext = 'webm';
+             if (fileBlob.type.includes('wav')) ext = 'wav';
+             else if (fileBlob.type.includes('mp4')) ext = 'mp4';
+             else if (fileBlob.type.includes('aac')) ext = 'aac';
+             
              fileName = `recording.${ext}`;
         }
         
@@ -244,15 +245,25 @@ const Dashboard = () => {
             
         const token = localStorage.getItem('musicTutorToken');
 
+        // Setup Timeout to prevent infinite "Processing"
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+
         try {
             const response = await fetch(endpoint, {
-                method: 'POST', body: formData, headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+                method: 'POST', 
+                body: formData, 
+                headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+                signal: controller.signal
             });
+            clearTimeout(timeoutId);
+
             if (response.status === 401) { handleLogout(); return; }
             
             if (!response.ok) {
                 console.error("Server Error:", response.status);
                 setStatus('error');
+                setErrorMsg(`Server Error (${response.status}). Please try again.`);
                 return;
             }
 
@@ -265,8 +276,19 @@ const Dashboard = () => {
                     setStudentData(data);
                     fetchHistory();
                 }
-            } else { setStatus('error'); }
-        } catch (e) { console.error(e); setStatus('error'); }
+            } else { 
+                setStatus('error');
+                setErrorMsg("Analysis failed. Please try a clearer recording.");
+            }
+        } catch (e) { 
+            console.error(e); 
+            setStatus('error');
+            if (e.name === 'AbortError') {
+                setErrorMsg("Server is waking up. Please try again!");
+            } else {
+                setErrorMsg("Connection failed. Check your internet.");
+            }
+        }
     };
 
     const handleDownloadReport = async () => {
@@ -309,7 +331,6 @@ const Dashboard = () => {
                 <button onClick={resetStudentAttempt} className="p-2 hover:bg-white/10 rounded-full transition-colors group" title="Back to Dashboard">
                     <ChevronDown className="w-5 h-5 text-slate-400 group-hover:text-white rotate-90" />
                 </button>
-
                 <div className="flex flex-col">
                     <div className="flex items-center gap-2">
                         <LayoutTemplate className="w-4 h-4 text-neon-cyan" />
@@ -322,7 +343,6 @@ const Dashboard = () => {
                     )}
                 </div>
             </div>
-
             <div className="flex items-center gap-3">
                 <button onClick={handleDownloadReport} disabled={isDownloading} className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-white/5 text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors text-xs font-bold border border-white/5">
                     {isDownloading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />} Download PDF
@@ -354,9 +374,18 @@ const Dashboard = () => {
             </div>
             <div className="relative z-10 w-full max-w-xs space-y-4 text-center">
                 <h3 className="text-white font-serif text-2xl mb-2">{label}</h3>
+                
+                {/* STATUS & ERROR MESSAGES */}
+                {status === 'error' && (
+                    <div className="bg-red-500/20 text-red-200 px-4 py-2 rounded-lg text-xs font-bold mb-4 flex items-center gap-2">
+                        <AlertCircle className="w-4 h-4" /> {errorMsg || "An error occurred."}
+                    </div>
+                )}
+                
                 {!isRecording ? (
-                    <button onClick={startRecording} disabled={status === 'processing'} className="flex items-center justify-center gap-3 w-full py-4 bg-white text-black rounded-xl font-bold text-lg shadow-lg hover:scale-105 transition-transform">
-                        <Mic className="text-black w-5 h-5" /> {status === 'processing' ? 'Processing...' : 'Record'}
+                    <button onClick={startRecording} disabled={status === 'processing'} className="flex items-center justify-center gap-3 w-full py-4 bg-white text-black rounded-xl font-bold text-lg shadow-lg hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed">
+                        {status === 'processing' ? <Loader2 className="w-5 h-5 animate-spin" /> : <Mic className="text-black w-5 h-5" />} 
+                        {status === 'processing' ? 'Processing...' : 'Record'}
                     </button>
                 ) : (
                     <button onClick={stopRecording} className="flex items-center justify-center gap-3 w-full py-4 bg-neon-pink text-white rounded-xl font-bold text-lg shadow-lg hover:scale-105 transition-transform">
