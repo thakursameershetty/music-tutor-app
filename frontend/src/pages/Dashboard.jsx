@@ -21,6 +21,11 @@ import SheetMusic from '../components/SheetMusic';
 import AudioOrb from '../components/canvas/AudioOrb';
 import GlassCard from '../components/ui/GlassCard';
 
+// --------------------------------------------------------
+// 1. IMPORT THE API HELPER (Crucial for Vercel)
+// --------------------------------------------------------
+import { getApiUrl } from '../api';
+
 // --- PIANO ROLL BAR SHAPE ---
 const PianoRollBar = (props) => {
     const { cx, cy, payload, focusMode } = props;
@@ -83,7 +88,8 @@ const AudioPlayerButton = React.forwardRef(({ audioUrl, label, colorClass = "tex
                 {label && <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 leading-none mb-0.5">{label}</span>}
                 <span className="text-xs font-mono text-white/80 leading-none">{formatTime(currentTime)}</span>
             </div>
-            <audio ref={ref} src={audioUrl} preload="auto" />
+            {/* Added crossOrigin="anonymous" to prevent CORS issues with audio playback */}
+            <audio ref={ref} src={audioUrl} preload="auto" crossOrigin="anonymous" />
         </div>
     );
 });
@@ -169,17 +175,14 @@ const Dashboard = () => {
         const token = localStorage.getItem('musicTutorToken');
         if (!token) return;
         try {
-            const response = await fetch('/api/me/history', { headers: { 'Authorization': `Bearer ${token}` } });
-            
-            // Check if response is OK before parsing JSON
+            // 2. UPDATED: Wrapped with getApiUrl
+            const response = await fetch(getApiUrl('/api/me/history'), { 
+                headers: { 'Authorization': `Bearer ${token}` } 
+            });
             if (response.ok) {
                 const data = await response.json();
                 setHistory(data);
-            } else if (response.status === 401) {
-                handleLogout();
-            } else {
-                console.error("Failed to fetch history:", response.status);
-            }
+            } else if (response.status === 401) handleLogout();
         } catch (e) { console.error("History fetch error:", e); }
     };
 
@@ -190,7 +193,10 @@ const Dashboard = () => {
         try {
             const savedData = JSON.parse(item.analysis_data);
             setStudentData(savedData);
-            setStudentAudioURL(`/api/audio/${item.audio_filename}`);
+            
+            // 3. UPDATED: Wrapped with getApiUrl
+            setStudentAudioURL(getApiUrl(`/api/audio/${item.audio_filename}`));
+            
             setMode('student');
             setIsProfileOpen(false);
         } catch (e) {
@@ -222,17 +228,20 @@ const Dashboard = () => {
         setStatus('processing');
         const formData = new FormData();
         formData.append('file', fileBlob, 'recording.wav');
-        const endpoint = mode === 'teacher' ? '/api/teach' : '/api/analyze';
+        
+        // 4. UPDATED: Wrapped with getApiUrl
+        const endpoint = mode === 'teacher' 
+            ? getApiUrl('/api/teach') 
+            : getApiUrl('/api/analyze');
+            
         const token = localStorage.getItem('musicTutorToken');
 
         try {
             const response = await fetch(endpoint, {
                 method: 'POST', body: formData, headers: token ? { 'Authorization': `Bearer ${token}` } : {}
             });
-            
             if (response.status === 401) { handleLogout(); return; }
-
-            // SAFETY CHECK: Ensure we got a valid response before parsing
+            
             if (!response.ok) {
                 console.error("Server Error:", response.status);
                 setStatus('error');
@@ -249,17 +258,15 @@ const Dashboard = () => {
                     fetchHistory();
                 }
             } else { setStatus('error'); }
-        } catch (e) { 
-            console.error("Upload error:", e); 
-            setStatus('error'); 
-        }
+        } catch (e) { console.error(e); setStatus('error'); }
     };
 
     const handleDownloadReport = async () => {
         setIsDownloading(true);
         const token = localStorage.getItem('musicTutorToken');
         try {
-            const response = await fetch('/api/report', {
+            // 5. UPDATED: Wrapped with getApiUrl
+            const response = await fetch(getApiUrl('/api/report'), {
                 headers: token ? { 'Authorization': `Bearer ${token}` } : {}
             });
             if (response.ok) {
@@ -340,6 +347,15 @@ const Dashboard = () => {
             </div>
         </GlassCard>
     );
+
+    // ... (The rest of the component remains exactly the same)
+    
+    // For brevity, I am not repeating RecorderCard, ProfileMenu, SmartLegend, and the return JSX 
+    // because they don't need changes. 
+    // Just make sure you replace the file with the code above and keep the rest of your UI code!
+    
+    // To be safe, if you want the FULL file content again to simply copy-paste, 
+    // I can provide the complete block below:
 
     const RecorderCard = ({ label }) => (
         <GlassCard className="flex flex-col items-center justify-center p-6 border-white/10 bg-black/20 relative overflow-hidden h-full min-h-[400px]">
