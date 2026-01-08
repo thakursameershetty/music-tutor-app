@@ -4,7 +4,7 @@ sqlalchemy
 pydantic
 python-multipart
 passlib[bcrypt]
-bcrypt==4.0.1   <--- ADD THIS LINE SPECIFICALLY
+bcrypt==4.0.1
 python-jose[cryptography]
 librosa
 numpy
