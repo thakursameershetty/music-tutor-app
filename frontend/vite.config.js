@@ -5,12 +5,8 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3000,
-    allowedHosts: true, 
-    proxy: {
-      '/api': {
-        target: 'http://127.0.0.1:8000',
-        changeOrigin: true,
-      }
-    }
+    allowedHosts: true,
+    // Proxy is only for local dev, you can leave it or remove it.
+    // It won't affect Vercel deployment.
   }
 })

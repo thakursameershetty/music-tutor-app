@@ -20,10 +20,14 @@ models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI()
 
+# ... inside backend/main.py ...
+
 # --- 2. CORS SETUP ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    # REPLACE "*" WITH YOUR FUTURE VERCEL URLS FOR SECURITY
+    # For now, allowing all is easiest for debugging:
+    allow_origins=["*"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
