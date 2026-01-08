@@ -6,8 +6,9 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from . import database, models
+import os
 
-SECRET_KEY = "music_tutor_secret_key_change_me"
+SECRET_KEY = os.getenv("SECRET_KEY", "music_tutor_secret_key_change_me")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 

@@ -1,3 +1,5 @@
 // frontend/src/api.js
-const API_BASE_URL = ""; // Empty string = Relative path
-export const getApiUrl = (endpoint) => `${API_BASE_URL}${endpoint}`;
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const cleanBaseUrl = API_BASE_URL.replace(/\/$/, ""); // Remove trailing slash if present
+
+export const getApiUrl = (endpoint) => `${cleanBaseUrl}${endpoint}`;
