@@ -20,14 +20,10 @@ models.Base.metadata.create_all(bind=database.engine)
 
 app = FastAPI()
 
-# ... inside backend/main.py ...
-
 # --- 2. CORS SETUP ---
 app.add_middleware(
     CORSMiddleware,
-    # REPLACE "*" WITH YOUR FUTURE VERCEL URLS FOR SECURITY
-    # For now, allowing all is easiest for debugging:
-    allow_origins=["*"], 
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -70,10 +66,19 @@ def get_history(current_user: models.User = Depends(auth.get_current_user), db: 
 @app.post("/api/teach")
 async def teach_lesson(file: UploadFile = File(...)):
     try:
-        file_location = "storage/audio_samples/teacher_reference.wav"
+        # 1. DETECT EXTENSION (Support MP3, FLAC, AAC, etc.)
+        filename, file_extension = os.path.splitext(file.filename)
+        # Default to .wav if missing
+        if not file_extension:
+            file_extension = ".wav"
+            
+        file_location = f"storage/audio_samples/teacher_reference{file_extension}"
+        
+        # 2. SAVE FILE
         with open(file_location, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
+        # 3. PROCESS (Librosa + FFmpeg handles the format automatically)
         teacher_notes = extract_notes_from_audio(file_location)
         if not teacher_notes:
             return {"status": "error", "message": "No notes detected."}
@@ -93,10 +98,18 @@ async def analyze_student(
     db: Session = Depends(auth.get_db)
 ):
     try:
-        temp_location = "storage/audio_samples/student_attempt.wav"
+        # 1. DETECT EXTENSION
+        filename, file_extension = os.path.splitext(file.filename)
+        if not file_extension:
+            file_extension = ".wav"
+
+        temp_location = f"storage/audio_samples/student_attempt{file_extension}"
+
+        # 2. SAVE TEMP FILE
         with open(temp_location, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
+        # 3. ANALYZE
         student_notes = extract_notes_from_audio(temp_location)
         feedback = calculate_feedback(student_notes, temp_location)
         xml_content = generate_musicxml(student_notes)
@@ -109,7 +122,9 @@ async def analyze_student(
             "feedback": feedback
         }
 
-        unique_filename = f"{current_user.id}_{uuid.uuid4()}.wav"
+        # 4. SAVE TO HISTORY (Persistent)
+        # Use the correct extension for the permanent file too
+        unique_filename = f"{current_user.id}_{uuid.uuid4()}{file_extension}"
         history_path = f"storage/history/{unique_filename}"
         shutil.copy(temp_location, history_path)
 
@@ -132,8 +147,17 @@ async def analyze_student(
 @app.get("/api/report")
 async def get_report():
     try:
-        student_path = "storage/audio_samples/student_attempt.wav"
-        if not os.path.exists(student_path):
+        # We need to find the student file regardless of extension
+        base_path = "storage/audio_samples/student_attempt"
+        student_path = None
+        
+        # Check for common extensions
+        for ext in [".wav", ".webm", ".mp3", ".flac", ".m4a", ".aac"]:
+            if os.path.exists(base_path + ext):
+                student_path = base_path + ext
+                break
+                
+        if not student_path:
              raise HTTPException(status_code=404, detail="No student recording found")
         
         student_notes = extract_notes_from_audio(student_path)
@@ -174,8 +198,7 @@ if os.path.exists(frontend_path):
 else:
     print("WARNING: Frontend build folder not found. Did you run 'npm run build'?")
 
-# --- 8. STARTUP BLOCK (Use this to run the server) ---
+# --- 8. STARTUP BLOCK ---
 if __name__ == "__main__":
     import uvicorn
-    # This runs the server on localhost:8000 when you execute 'python main.py'
     uvicorn.run(app, host="127.0.0.1", port=8000)

@@ -2,8 +2,8 @@
 # Exit on error
 set -o errexit
 
-# Install PortAudio (Required for PyAudio)
-sudo apt-get update && sudo apt-get install -y portaudio19-dev
+# Install PortAudio (for PyAudio) AND FFmpeg (for reading browser audio)
+sudo apt-get update && sudo apt-get install -y portaudio19-dev ffmpeg
 
 # Upgrade pip
 pip install --upgrade pip

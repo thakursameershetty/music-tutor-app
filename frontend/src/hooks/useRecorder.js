@@ -27,7 +27,12 @@ const useRecorder = () => {
       setAnalyser(analyserNode);
 
       // 2. Setup MediaRecorder
-      const mediaRecorder = new MediaRecorder(stream);
+      // Detect the correct MIME type for this browser
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') 
+        ? 'audio/webm' 
+        : 'audio/mp4';
+
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -38,7 +43,8 @@ const useRecorder = () => {
       };
 
       mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+        // Create blob with the REAL mime type (not fake wav)
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
         setAudioBlob(audioBlob);
         
         // Cleanup Audio Context & Stream
