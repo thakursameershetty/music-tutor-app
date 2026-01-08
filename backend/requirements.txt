@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+python-multipart
+librosa
+numpy
+pandas
+scipy
+music21
+fastdtw
+matplotlib
+xhtml2pdf
+sqlalchemy
+passlib[bcrypt]
+python-jose[cryptography]
