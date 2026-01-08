@@ -6,6 +6,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 import shutil
 import os
+import glob # IMPORT GLOB FOR CLEANUP
 import json
 import uuid  # For unique filenames
 
@@ -98,6 +99,16 @@ async def analyze_student(
     db: Session = Depends(auth.get_db)
 ):
     try:
+        # 0. CLEANUP OLD FILES (Fix for Score Consistency)
+        # We must remove any 'student_attempt.*' files (wav, mp3, webm, etc.)
+        # so the system doesn't accidentally load an old file later.
+        old_files = glob.glob("storage/audio_samples/student_attempt.*")
+        for f in old_files:
+            try:
+                os.remove(f)
+            except OSError:
+                pass
+
         # 1. DETECT EXTENSION
         filename, file_extension = os.path.splitext(file.filename)
         if not file_extension:
@@ -123,7 +134,6 @@ async def analyze_student(
         }
 
         # 4. SAVE TO HISTORY (Persistent)
-        # Use the correct extension for the permanent file too
         unique_filename = f"{current_user.id}_{uuid.uuid4()}{file_extension}"
         history_path = f"storage/history/{unique_filename}"
         shutil.copy(temp_location, history_path)
@@ -152,6 +162,7 @@ async def get_report():
         student_path = None
         
         # Check for common extensions
+        # Since we cleaned up in /analyze, only ONE file should exist now.
         for ext in [".wav", ".webm", ".mp3", ".flac", ".m4a", ".aac"]:
             if os.path.exists(base_path + ext):
                 student_path = base_path + ext
