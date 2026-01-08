@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import GlassCard from '../components/ui/GlassCard';
 import { User, Lock, ArrowRight } from 'lucide-react';
+// Import the helper function
+import { getApiUrl } from '../api'; 
 
 const Login = () => {
     const [isLogin, setIsLogin] = useState(true);
@@ -10,41 +12,62 @@ const Login = () => {
     const [error, setError] = useState("");
     const navigate = useNavigate();
 
-    // --- FIX: Check for existing session on mount ---
+    // Check for existing session on mount
     useEffect(() => {
         const token = localStorage.getItem("musicTutorToken");
         if (token) {
-            // If already logged in, go straight to dashboard
             navigate("/dashboard", { replace: true });
         }
     }, [navigate]);
-    // -----------------------------------------------
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        console.log("STEP 1: Submit button clicked"); 
+
         setError("");
         
-        const endpoint = isLogin ? "/api/token" : "/api/register";
-        const formData = new FormData();
-        formData.append("username", username);
-        formData.append("password", password);
-
         try {
+            console.log("STEP 2: Determining endpoint...");
+            const path = isLogin ? "/api/token" : "/api/register";
+            
+            console.log("STEP 3: Calling getApiUrl with path:", path);
+            // If it crashes here, your import from '../api' is broken
+            const endpoint = getApiUrl(path); 
+            console.log("STEP 4: Target URL is:", endpoint); 
+
+            const formData = new FormData();
+            formData.append("username", username);
+            formData.append("password", password);
+
+            console.log("STEP 5: Starting Fetch to", endpoint);
             const res = await fetch(endpoint, { method: "POST", body: formData });
+            console.log("STEP 6: Response received. Status:", res.status);
+            
+            // Safety check: Did the server send JSON?
+            const contentType = res.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) {
+                console.log("ERROR: Response is not JSON. Content-Type:", contentType);
+                const text = await res.text();
+                console.log("Response Body (HTML/Text):", text);
+                throw new Error("Server sent HTML/Text instead of JSON. The URL might be wrong or the backend is crashing.");
+            }
+
             const data = await res.json();
+            console.log("STEP 7: Data parsed successfully", data); 
 
             if (!res.ok) throw new Error(data.detail || "Authentication failed");
 
             if (isLogin) {
-                // Save token
+                console.log("STEP 8: Login Success"); 
                 localStorage.setItem("musicTutorToken", data.access_token);
-                // --- FIX: Use 'replace: true' so Back button skips login page ---
                 navigate("/dashboard", { replace: true });
             } else {
+                console.log("STEP 8: Register Success");
                 setIsLogin(true);
                 setError("Registered! Please log in.");
             }
         } catch (err) {
+            console.error("CRITICAL ERROR IN HANDLESUBMIT:", err);
             setError(err.message);
         }
     };
