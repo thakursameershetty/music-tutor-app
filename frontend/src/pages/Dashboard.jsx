@@ -120,11 +120,11 @@ const Dashboard = () => {
                 if (ref.current) {
                     try {
                         const vol = ref.current.volume;
-                        ref.current.volume = 0; 
+                        ref.current.volume = 0;
                         await ref.current.play();
                         ref.current.pause();
                         ref.current.currentTime = 0;
-                        ref.current.volume = vol; 
+                        ref.current.volume = vol;
                     } catch (e) { console.log("Audio prime failed", e); }
                 }
             };
@@ -168,8 +168,8 @@ const Dashboard = () => {
         const token = localStorage.getItem('musicTutorToken');
         if (!token) return;
         try {
-            const response = await fetch(getApiUrl('/api/me/history'), { 
-                headers: { 'Authorization': `Bearer ${token}` } 
+            const response = await fetch(getApiUrl('/api/me/history'), {
+                headers: { 'Authorization': `Bearer ${token}` }
             });
             if (response.ok) {
                 const data = await response.json();
@@ -187,7 +187,7 @@ const Dashboard = () => {
             if (savedData.teacher_data) {
                 setTeacherData(savedData.teacher_data);
             } else {
-                setTeacherData(null); 
+                setTeacherData(null);
             }
             setStudentAudioURL(getApiUrl(`/api/audio/${item.audio_filename}`));
             setMode('student');
@@ -220,29 +220,29 @@ const Dashboard = () => {
     const handleUpload = async (fileBlob) => {
         setStatus('processing');
         setErrorMsg(null);
-        
+
         const formData = new FormData();
-        let fileName = 'recording.webm'; 
-        
+        let fileName = 'recording.webm';
+
         // --- SMART EXTENSION FIX ---
         if (fileBlob.name) {
             fileName = fileBlob.name; // File upload
         } else {
-             // Mic Recording: Check MIME type carefully
-             let ext = 'webm';
-             if (fileBlob.type.includes('wav')) ext = 'wav';
-             else if (fileBlob.type.includes('mp4')) ext = 'mp4';
-             else if (fileBlob.type.includes('aac')) ext = 'aac';
-             
-             fileName = `recording.${ext}`;
+            // Mic Recording: Check MIME type carefully
+            let ext = 'webm';
+            if (fileBlob.type.includes('wav')) ext = 'wav';
+            else if (fileBlob.type.includes('mp4')) ext = 'mp4';
+            else if (fileBlob.type.includes('aac')) ext = 'aac';
+
+            fileName = `recording.${ext}`;
         }
-        
+
         formData.append('file', fileBlob, fileName);
-        
-        const endpoint = mode === 'teacher' 
-            ? getApiUrl('/api/teach') 
+
+        const endpoint = mode === 'teacher'
+            ? getApiUrl('/api/teach')
             : getApiUrl('/api/analyze');
-            
+
         const token = localStorage.getItem('musicTutorToken');
 
         // Setup Timeout to prevent infinite "Processing"
@@ -251,15 +251,15 @@ const Dashboard = () => {
 
         try {
             const response = await fetch(endpoint, {
-                method: 'POST', 
-                body: formData, 
+                method: 'POST',
+                body: formData,
                 headers: token ? { 'Authorization': `Bearer ${token}` } : {},
                 signal: controller.signal
             });
             clearTimeout(timeoutId);
 
             if (response.status === 401) { handleLogout(); return; }
-            
+
             if (!response.ok) {
                 console.error("Server Error:", response.status);
                 setStatus('error');
@@ -276,12 +276,12 @@ const Dashboard = () => {
                     setStudentData(data);
                     fetchHistory();
                 }
-            } else { 
+            } else {
                 setStatus('error');
                 setErrorMsg("Analysis failed. Please try a clearer recording.");
             }
-        } catch (e) { 
-            console.error(e); 
+        } catch (e) {
+            console.error(e);
             setStatus('error');
             if (e.name === 'AbortError') {
                 setErrorMsg("Server is waking up. Please try again!");
@@ -374,17 +374,17 @@ const Dashboard = () => {
             </div>
             <div className="relative z-10 w-full max-w-xs space-y-4 text-center">
                 <h3 className="text-white font-serif text-2xl mb-2">{label}</h3>
-                
+
                 {/* STATUS & ERROR MESSAGES */}
                 {status === 'error' && (
                     <div className="bg-red-500/20 text-red-200 px-4 py-2 rounded-lg text-xs font-bold mb-4 flex items-center gap-2">
                         <AlertCircle className="w-4 h-4" /> {errorMsg || "An error occurred."}
                     </div>
                 )}
-                
+
                 {!isRecording ? (
                     <button onClick={startRecording} disabled={status === 'processing'} className="flex items-center justify-center gap-3 w-full py-4 bg-white text-black rounded-xl font-bold text-lg shadow-lg hover:scale-105 transition-transform disabled:opacity-50 disabled:cursor-not-allowed">
-                        {status === 'processing' ? <Loader2 className="w-5 h-5 animate-spin" /> : <Mic className="text-black w-5 h-5" />} 
+                        {status === 'processing' ? <Loader2 className="w-5 h-5 animate-spin" /> : <Mic className="text-black w-5 h-5" />}
                         {status === 'processing' ? 'Processing...' : 'Record'}
                     </button>
                 ) : (
@@ -475,8 +475,8 @@ const Dashboard = () => {
                         <h1 className="text-5xl font-serif font-bold tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white to-white/60">Music Tutor</h1>
                         <div className="p-1 rounded-full bg-white/5 border border-white/10 backdrop-blur-md flex shadow-2xl">
                             <motion.div className={`absolute top-1 bottom-1 rounded-full shadow-lg ${mode === 'teacher' ? 'bg-neon-blue' : 'bg-neon-purple'}`} initial={false} animate={{ x: mode === 'teacher' ? 0 : '100%', width: '50%' }} />
-                            <button onClick={() => switchMode('teacher')} className={`relative z-10 px-8 py-2 rounded-full text-xs font-bold uppercase tracking-widest ${mode === 'teacher' ? 'text-white' : 'text-slate-400'}`}>Teacher</button>
-                            <button onClick={() => switchMode('student')} className={`relative z-10 px-8 py-2 rounded-full text-xs font-bold uppercase tracking-widest ${mode === 'student' ? 'text-white' : 'text-slate-400'}`}>Student</button>
+                            <button onClick={() => switchMode('teacher')} className={`relative z-10 px-8 py-2 rounded-full text-xs font-bold uppercase tracking-widest ${mode === 'teacher' ? 'text-white' : 'text-slate-400'}`}>Reference Score</button>
+                            <button onClick={() => switchMode('student')} className={`relative z-10 px-8 py-2 rounded-full text-xs font-bold uppercase tracking-widest ${mode === 'student' ? 'text-white' : 'text-slate-400'}`}>Input Performance</button>
                         </div>
                     </header>
                 )}
